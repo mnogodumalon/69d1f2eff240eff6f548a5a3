@@ -6,6 +6,7 @@ import { useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { AI_PHOTO_SCAN, AI_PHOTO_LOCATION } from '@/config/ai-features';
@@ -79,7 +80,6 @@ export default function DashboardOverview() {
     return enrichedZeitplanAblauf
       .filter(e => e.fields.zeitplan_uhrzeit && new Date(e.fields.zeitplan_uhrzeit) >= now)
       .sort((a, b) => new Date(a.fields.zeitplan_uhrzeit!).getTime() - new Date(b.fields.zeitplan_uhrzeit!).getTime())
-      .slice(0, 4);
   }, [enrichedZeitplanAblauf]);
 
   const prioritaetColor = (key?: string) => {
@@ -193,12 +193,43 @@ export default function DashboardOverview() {
 
       {/* KPI Karten */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard
-          title="Gäste zugesagt"
-          value={String(zugesagt)}
-          description={`${ausstehend} ausstehend · ${gaesteliste.length} gesamt`}
-          icon={<IconUsers size={18} className="text-muted-foreground" />}
-        />
+        {/* Gäste zugesagt – mit Popover */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="text-left w-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
+              <StatCard
+                title="Gäste zugesagt"
+                value={String(zugesagt)}
+                description={`${ausstehend} ausstehend · ${gaesteliste.length} gesamt`}
+                icon={<IconUsers size={18} className="text-muted-foreground" />}
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-0 max-h-80 overflow-y-auto" align="start">
+            <div className="sticky top-0 bg-popover border-b border-border px-4 py-3">
+              <p className="text-sm font-semibold text-foreground">Gäste zugesagt ({zugesagt})</p>
+            </div>
+            {gaesteliste.filter(g => g.fields.rsvp_status?.key === 'zugesagt').length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">Noch keine Zusagen</div>
+            ) : (
+              <div className="divide-y divide-border">
+                {gaesteliste
+                  .filter(g => g.fields.rsvp_status?.key === 'zugesagt')
+                  .map(g => (
+                    <div key={g.record_id} className="flex items-center gap-2 px-4 py-2.5">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <IconUsers size={13} className="text-primary" />
+                      </div>
+                      <span className="text-sm text-foreground truncate">
+                        {[g.fields.gast_vorname, g.fields.gast_nachname].filter(Boolean).join(' ') || 'Unbekannt'}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+
         <StatCard
           title="Offene Aufgaben"
           value={String(offeneAufgaben.length)}
@@ -211,12 +242,57 @@ export default function DashboardOverview() {
           description={budgetGesamtbudget > 0 ? `von ${formatCurrency(budgetGesamtbudget)} geplant${budgetProzent !== null ? ` · ${budgetProzent}%` : ''}` : `${budgetplanung.length} Posten`}
           icon={<IconCurrencyEuro size={18} className="text-muted-foreground" />}
         />
-        <StatCard
-          title="Dienstleister"
-          value={String(dienstleister.length)}
-          description={`${dienstleister.filter(d => d.fields.dl_zahlungsstatus?.key === 'vollstaendig_bezahlt').length} vollst. bezahlt`}
-          icon={<IconConfetti size={18} className="text-muted-foreground" />}
-        />
+
+        {/* Dienstleister – mit Popover */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="text-left w-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
+              <StatCard
+                title="Dienstleister"
+                value={String(dienstleister.length)}
+                description={`${dienstleister.filter(d => d.fields.dl_zahlungsstatus?.key === 'vollstaendig_bezahlt').length} vollst. bezahlt`}
+                icon={<IconConfetti size={18} className="text-muted-foreground" />}
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-0 max-h-80 overflow-y-auto" align="end">
+            <div className="sticky top-0 bg-popover border-b border-border px-4 py-3">
+              <p className="text-sm font-semibold text-foreground">Dienstleister ({dienstleister.length})</p>
+            </div>
+            {dienstleister.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">Noch keine Dienstleister erfasst</div>
+            ) : (
+              <div className="divide-y divide-border">
+                {dienstleister.map(d => (
+                  <div key={d.record_id} className="flex items-center justify-between gap-2 px-4 py-2.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <IconConfetti size={13} className="text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-foreground truncate">{d.fields.dl_firmenname || 'Unbekannt'}</p>
+                        {d.fields.dl_kategorie && (
+                          <p className="text-xs text-muted-foreground truncate">{d.fields.dl_kategorie.label}</p>
+                        )}
+                      </div>
+                    </div>
+                    {d.fields.dl_zahlungsstatus && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 font-medium ${
+                        d.fields.dl_zahlungsstatus.key === 'vollstaendig_bezahlt'
+                          ? 'bg-green-50 text-green-700'
+                          : d.fields.dl_zahlungsstatus.key === 'anzahlung_geleistet'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-slate-50 text-slate-600'
+                      }`}>
+                        {d.fields.dl_zahlungsstatus.label}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Hauptbereich: Aufgaben + Zeitplan */}
@@ -411,14 +487,12 @@ export default function DashboardOverview() {
             )}
           </div>
 
-          {enrichedZeitplanAblauf.length > 4 && (
-            <div className="px-5 py-3 border-t border-border bg-muted/30">
-              <a href="#/zeitplan-&-ablauf" className="text-xs text-primary flex items-center gap-1 hover:underline">
-                Alle {enrichedZeitplanAblauf.length} Termine anzeigen
-                <IconChevronRight size={13} />
-              </a>
-            </div>
-          )}
+          <div className="px-5 py-3 border-t border-border bg-muted/30">
+            <a href="#/zeitplan-&-ablauf" className="text-xs text-primary flex items-center gap-1 hover:underline">
+              Alle Termine verwalten
+              <IconChevronRight size={13} />
+            </a>
+          </div>
         </div>
       </div>
 
