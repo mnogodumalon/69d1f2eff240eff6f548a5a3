@@ -411,14 +411,6 @@ export default function DashboardOverview() {
             )}
           </div>
 
-          {enrichedZeitplanAblauf.length > 4 && (
-            <div className="px-5 py-3 border-t border-border bg-muted/30">
-              <a href="#/zeitplan-&-ablauf" className="text-xs text-primary flex items-center gap-1 hover:underline">
-                Alle {enrichedZeitplanAblauf.length} Termine anzeigen
-                <IconChevronRight size={13} />
-              </a>
-            </div>
-          )}
         </div>
       </div>
 
